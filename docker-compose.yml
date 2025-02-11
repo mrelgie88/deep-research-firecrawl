@@ -1,0 +1,161 @@
+
+services:
+  # Deep-Research Service
+  deep-research:
+    build: ./apps/deep-research
+    environment:
+      - FIRECRAWL_BASE_URL=${FIRECRAWL_BASE_URL}
+      - FIRECRAWL_BASE_URL_SCRAPE=${FIRECRAWL_BASE_URL_SCRAPE}
+      - OPENAI_KEY=${OPENAI_KEY}
+      - OPENAI_ENDPOINT=${OPENAI_ENDPOINT}
+      - SEARXNG_BASE_URL=http://searxng:8080  # Use internal SearxNG service
+      - MODEL=${MODEL}
+    ports:
+      - "3001:3001"  # Exposes port 3001 on the host mapped to container’s port 3001
+    command: [ "npm", "run", "start:api" ]
+    networks:
+      - backend
+    tty: true
+    stdin_open: true
+
+  # Firecrawl Playwright Service
+  playwright-service:
+    build: ./apps/firecrawl/apps/playwright-service
+    environment:
+      - PORT=3000
+      - PROXY_SERVER=${PROXY_SERVER}
+      - PROXY_USERNAME=${PROXY_USERNAME}
+      - PROXY_PASSWORD=${PROXY_PASSWORD}
+      - BLOCK_MEDIA=${BLOCK_MEDIA}
+    networks:
+      - backend
+
+  # Firecrawl API Service
+  api:
+    build: ./apps/firecrawl/apps/api
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - REDIS_RATE_LIMIT_URL=${REDIS_URL:-redis://redis:6379}
+      - PLAYWRIGHT_MICROSERVICE_URL=${PLAYWRIGHT_MICROSERVICE_URL:-http://playwright-service:3000}
+      - USE_DB_AUTHENTICATION=${USE_DB_AUTHENTICATION}
+      - PORT=${PORT:-3002}
+      - NUM_WORKERS_PER_QUEUE=${NUM_WORKERS_PER_QUEUE}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+      - MODEL_NAME=${MODEL_NAME:-gpt-4o}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - LLAMAPARSE_API_KEY=${LLAMAPARSE_API_KEY}
+      - LOGTAIL_KEY=${LOGTAIL_KEY}
+      - BULL_AUTH_KEY=${BULL_AUTH_KEY}
+      - TEST_API_KEY=${TEST_API_KEY}
+      - POSTHOG_API_KEY=${POSTHOG_API_KEY}
+      - POSTHOG_HOST=${POSTHOG_HOST}
+      - SUPABASE_ANON_TOKEN=${SUPABASE_ANON_TOKEN}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_TOKEN=${SUPABASE_SERVICE_TOKEN}
+      - SCRAPING_BEE_API_KEY=${SCRAPING_BEE_API_KEY}
+      - HOST=${HOST:-0.0.0.0}
+      - SELF_HOSTED_WEBHOOK_URL=${SELF_HOSTED_WEBHOOK_URL}
+      - LOGGING_LEVEL=${LOGGING_LEVEL}
+      - FLY_PROCESS_GROUP=app
+    depends_on:
+      - redis
+      - playwright-service
+      - searxng
+    ports:
+      - "3002:3002"  # Exposes port 3002 on the host for this API service
+    networks:
+      - backend
+    command: [ "pnpm", "run", "start:production" ]
+
+  # Firecrawl Worker
+  worker:
+    build: ./apps/firecrawl/apps/api
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - REDIS_RATE_LIMIT_URL=${REDIS_URL:-redis://redis:6379}
+      - PLAYWRIGHT_MICROSERVICE_URL=${PLAYWRIGHT_MICROSERVICE_URL:-http://playwright-service:3000}
+      - USE_DB_AUTHENTICATION=${USE_DB_AUTHENTICATION}
+      - PORT=${PORT:-3002}
+      - NUM_WORKERS_PER_QUEUE=${NUM_WORKERS_PER_QUEUE}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+      - MODEL_NAME=${MODEL_NAME:-gpt-4o}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - LLAMAPARSE_API_KEY=${LLAMAPARSE_API_KEY}
+      - LOGTAIL_KEY=${LOGTAIL_KEY}
+      - BULL_AUTH_KEY=${BULL_AUTH_KEY}
+      - TEST_API_KEY=${TEST_API_KEY}
+      - POSTHOG_API_KEY=${POSTHOG_API_KEY}
+      - POSTHOG_HOST=${POSTHOG_HOST}
+      - SUPABASE_ANON_TOKEN=${SUPABASE_ANON_TOKEN}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_TOKEN=${SUPABASE_SERVICE_TOKEN}
+      - SCRAPING_BEE_API_KEY=${SCRAPING_BEE_API_KEY}
+      - HOST=${HOST:-0.0.0.0}
+      - SELF_HOSTED_WEBHOOK_URL=${SELF_HOSTED_WEBHOOK_URL}
+      - LOGGING_LEVEL=${LOGGING_LEVEL}
+      - FLY_PROCESS_GROUP=worker
+    depends_on:
+      - redis
+      - playwright-service
+      - api
+      - searxng
+    networks:
+      - backend
+    command: [ "pnpm", "run", "workers" ]
+
+  # Redis
+  redis:
+    image: redis:alpine
+    networks:
+      - backend
+    command: redis-server --bind 0.0.0.0
+
+
+  # SearxNG Service (Internal Only)
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    environment:
+      - INSTANCE_NAME=MyInternalSearxNG
+      - ENABLE_STATS=False   
+      - SEARXNG_BASE_URL=${SEARXNG_BASE_URL}
+    ports:
+      - "8080:8080"  # Expose port 8080 externally (and available internally)
+    networks:
+      - backend
+    volumes:
+      - ./settings.yml:/etc/searxng/settings.yml
+
+  # Frontend Web GUI
+  frontend:
+    build: ./apps/frontend  # Path to your frontend project
+    environment:
+      # When running inside Docker on the same network, using the service name works.
+      # If you want the built frontend (running in the browser) to access the API from your host,
+      # you may need to set this to "http://localhost:3001" instead.
+      - REACT_APP_API_BASE_URL=http://localhost:3001
+    ports:
+      - "8081:80"  # Exposes the frontend on host port 8080
+    networks:
+      - backend
+    depends_on:
+      - deep-research
+    volumes:
+      - ./apps/frontend/src/components/ChatInterface.js:/app/src/components/ChatInterface.js
+      # NEW: API Test Service
+  api-test:
+    build: ./apps/api-test
+    depends_on:
+      - deep-research
+    environment:
+      # Use the deep-research service name to reach the API within the Docker network
+      - API_BASE_URL=http://deep-research:3001
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge

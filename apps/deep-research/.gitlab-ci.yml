@@ -1,0 +1,46 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  DOCKER_BUILDKIT: "1"
+  COMPOSE_DOCKER_CLI_BUILD: "1"
+  #FIRECRAWL_KEY: "$FIRECRAWL_KEY"
+  FIRECRAWL_BASE_URL: $FIRECRAWL_BASE_URL
+  FIRECRAWL_BASE_URL_SCRAPE: "$FIRECRAWL_BASE_URL_SCRAPE"
+  OPENAI_KEY: "$OPENAI_KEY"
+  MODEL: "$MODEL"
+
+build:
+  stage: build
+  tags:
+    - docker
+  script:
+    - echo "Generating .env.local from GitLab CI/CD variables"
+    #- echo "FIRECRAWL_KEY=$FIRECRAWL_KEY" > .env.local
+    - echo "FIRECRAWL_BASE_URL=$FIRECRAWL_BASE_URL" >> .env.local
+    - echo "FIRECRAWL_BASE_URL_SCRAPE=$FIRECRAWL_BASE_URL_SCRAPE" >> .env.local
+    - echo "OPENAI_KEY=$OPENAI_KEY" >> .env.local
+    - echo "OPENAI_ENDPOINT=$OPENAI_ENDPOINT" >> .env.local
+    - echo "SEARXNG_BASE_URL=$SEARXNG_BASE_URL" >> .env.local
+    - echo "MODEL=$MODEL" >> .env.local
+    - cat .env.local  # Debugging: Show contents (remove if sensitive)
+    - echo "Fixing file permissions"
+    - '[ -f docker-entrypoint.sh ] && chmod +x docker-entrypoint.sh || echo "Skipping: docker-entrypoint.sh not found"'
+    - docker-compose build
+  only:
+    - main
+
+deploy:
+  stage: deploy
+  tags:
+    - docker
+  script:
+    - echo "Stopping existing container..."
+    - docker-compose down
+    - echo "Pulling latest image..."
+    - docker-compose pull
+    - echo "Starting updated container..."
+    - docker-compose up -d
+  only:
+    - main
