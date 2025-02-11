@@ -61,7 +61,7 @@ flowchart LR
 - **Firecrawl** has an API (port `3002`), Worker, and Playwright Service.
 - **SearxNG** runs internally at `http://searxng:8080`.
 - **Redis** is internal at `redis://redis:6379`.
-- **Front-end** is exposed on `http://localhost:8080`.
+- **Front-end** is exposed on `http://localhost:8081`.
 
 ---
 
@@ -156,7 +156,7 @@ COMPOSE_DOCKER_CLI_BUILD=1
 
 1. **Clone the repo**:
    ```bash
-   git clone https://gitlab.elgie.net/ai/firecrawl-deep-research.git
+   git clone https://github.com/mrelgie88/deep-research-firecrawl
    cd firecrawl-deep-research
    ```
 
@@ -176,7 +176,7 @@ COMPOSE_DOCKER_CLI_BUILD=1
    - This launches all containers (Deep-Research, Firecrawl, SearxNG, Redis, and the Front-End).
 
 4. **Verify**:
-   - Visit [http://localhost:8080](http://localhost:8080) for the front-end.
+   - Visit [http://localhost:8081] for the front-end.
    - Deep-Research is at `[HOST_IP]:3001`, Firecrawl API at `[HOST_IP]:3002`.
 
 ---
@@ -184,7 +184,7 @@ COMPOSE_DOCKER_CLI_BUILD=1
 ## Usage
 
 ### Front-End Web GUI
-- Accessible at `http://localhost:8080`.
+- Accessible at `http://localhost:8081`.
 - Sends user queries to Deep-Research (`http://deep-research:3001`).
 
 ### Deep-Research
